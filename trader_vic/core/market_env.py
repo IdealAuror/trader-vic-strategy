@@ -35,12 +35,16 @@ class MarketEnvClassifier:
         self,
         csi300_daily: pd.DataFrame,
         csi300_weekly: pd.DataFrame,
+        daily_trend: TrendDirection | None = None,
+        weekly_trend: TrendDirection | None = None,
     ) -> str:
         """分类当前市场环境
 
         Args:
             csi300_daily: 沪深 300 日线 DataFrame
             csi300_weekly: 沪深 300 周线 DataFrame
+            daily_trend: 预计算的日线趋势（避免重建 SwingDetector）
+            weekly_trend: 预计算的周线趋势
 
         Returns:
             环境名称
@@ -53,12 +57,19 @@ class MarketEnvClassifier:
         low = csi300_daily["low"].values
         volume = csi300_daily["volume"].values if "volume" in csi300_daily else None
 
-        # 用完整数据构建 SwingDetector 获取趋势状态（无状态累积）
-        daily_state = self._build_swing_state(close, high, low, lookback=10)
+        # 使用预计算的趋势状态，避免每次重建 SwingDetector
+        if daily_trend is not None:
+            daily_state = daily_trend
+        else:
+            daily_state = self._build_swing_state(close, high, low, lookback=10)
 
         weekly_state = TrendDirection.RANGE
         weekly_close = None
-        if csi300_weekly is not None and not csi300_weekly.empty:
+        if weekly_trend is not None:
+            weekly_state = weekly_trend
+            if csi300_weekly is not None and not csi300_weekly.empty:
+                weekly_close = csi300_weekly["close"].values
+        elif csi300_weekly is not None and not csi300_weekly.empty:
             weekly_close = csi300_weekly["close"].values
             wh = csi300_weekly["high"].values
             wl = csi300_weekly["low"].values

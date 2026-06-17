@@ -80,18 +80,16 @@ class StopManager:
         self._highest_price = max(self._highest_price, high)
         self._lowest_price = min(self._lowest_price, low)
 
-        # 多头：止损只上移不下移
         if self._is_long:
-            new_stop = max(self._stop, self._highest_price * 0.95)
-            self._stop = min(new_stop, self.entry_price * 1.5)  # 上限防漂移
+            # 止损只上移不下移，上限不超过当天最低价附近
+            new_stop = max(self._stop, min(self._highest_price * 0.95, low * 0.995))
+            self._stop = new_stop
 
             if low <= self._stop:
                 return "STOP_HIT"
-
-        # 空头：止损只下移不上移
         else:
-            new_stop = min(self._stop, self._lowest_price * 1.05)
-            self._stop = max(new_stop, self.entry_price * 0.5)
+            new_stop = min(self._stop, max(self._lowest_price * 1.05, high * 1.005))
+            self._stop = new_stop
 
             if high >= self._stop:
                 return "STOP_HIT"

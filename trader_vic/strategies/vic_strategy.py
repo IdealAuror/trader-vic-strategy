@@ -157,7 +157,11 @@ class TraderVicStrategy:
 
         # ── Step 1.5: 市场环境分类 ──
         weekly_df = self._resample_index_to_weekly(csi300_history)
-        env = self.env_classifier.classify(csi300_history, weekly_df)
+        env = self.env_classifier.classify(
+            csi300_history, weekly_df,
+            daily_trend=self.csi300_daily_detector.state,
+            weekly_trend=csi300_weekly_trend,
+        )
         env_adapt = self.env_classifier.get_env_adapt(env)
         self.pm.set_position_cap(env_adapt.get("position_cap", 1.0))
         self.consensus.set_environment(env_adapt)

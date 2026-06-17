@@ -6,19 +6,30 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 Quantitative trading strategy based on Victor Sperandeo's "Trader Vic: Methods of a Wall Street Master" (专业投机原理), targeting A-shares (沪深A股). Uses a multi-layer confirmation funnel approach — not a signal-chasing system, but a risk-management system.
 
-**Current status**: Phase 1 pre-implementation. Directory structure exists, but zero Python files written. Full implementation plan at `C:\Users\MOSS\.claude\plans\abstract-mapping-sky.md`.
+**Current status**: Phase 1 implementation. ~30 Python files, ~3000 lines. Core modules, signal detection, multi-layer confirmation, risk/capital management all implemented.
 
 ## Architecture (Phase 1)
 
-17 files, ~2400 lines, 6 implementation steps:
+~30 files, ~3000 lines, implementation complete:
 
 ```
-Step 1: config.py, data/providers.py, requirements.txt
-Step 2: core/trend.py (SwingDetector weekly+daily), core/signals.py, core/probability.py
-Step 3: core/fundamental_regime.py, core/consensus.py, core/risk.py, core/capital.py, core/market_env.py
-Step 4: portfolio/mgr.py
-Step 5: strategies/vic_strategy.py
-Step 6: fetch.py, backtest.py, reports/backtest.py, daily_report.py, reports/daily_html.py
+trader_vic/config.py               — global parameters
+trader_vic/core/trend.py           — SwingDetector + TrendAge + MarketPhase
+trader_vic/core/signals.py         — 1-2-3/2B/FourDay/ThreeDayPullback/ABC/NarrowRange
+trader_vic/core/probability.py     — EV + Kelly
+trader_vic/core/consensus.py       — 4-layer confirmation funnel + Dow
+trader_vic/core/risk.py            — RRR/Stop/TimeStop/ConsecutiveLossPause
+trader_vic/core/capital.py         — 3-tier pyramid capital management
+trader_vic/core/market_env.py      — 7-condition environment classifier
+trader_vic/core/fundamental_regime.py — multi-dim fundamental scoring
+trader_vic/core/alpha_factors.py   — alpha factor ranking
+trader_vic/core/divergence.py      — RSI divergence confirmation
+trader_vic/core/stock_pool.py      — watchlist management
+trader_vic/portfolio/mgr.py        — portfolio risk accounting
+trader_vic/strategies/vic_strategy.py — main 10-step strategy loop
+trader_vic/data/providers.py       — akshare fetch + CSV cache + validation
+reports/backtest.py                — backtest engine
+reports/daily_html.py              — daily report generator
 ```
 
 ### Main flow (per-bar)
@@ -59,7 +70,7 @@ Quality gates:
 ### Key constants (A-share specific)
 
 ```python
-RISK_PCT = 0.02              # Per-trade max risk
+RISK_PCT = 0.015              # Per-trade max risk
 TOTAL_RISK_BUDGET = 0.15     # Total portfolio risk cap
 CN_BULL_MEAN_MONTHS = 14     # CSI300 bull market mean
 CN_BEAR_MEAN_MONTHS = 7      # CSI300 bear market mean
@@ -74,13 +85,16 @@ STAMP_TAX_RATE = 0.001       # 千一, sell only
 | `config.py` | Constants, probability table, ENV_ADAPTATION table | — (pure config) |
 | `data/providers.py` | `fetch_watchlist()`, `fetch_index()`, `validate_stock_data()`, `resample_to_weekly()` | tickers × dates → dict[OHLCV DataFrame] |
 | `core/trend.py` | `SwingDetector`, `TrendAge`, `RetracementLocator`, `MarketPhase` | OHLC series → UP/DOWN/RANGE state |
-| `core/signals.py` | `Criterion123`, `Criterion2B`, `FourDayRule`, `ThreeDayPullback` | OHLC arrays → `Signal(direction,confidence,stop,target)` or None |
-| `core/probability.py` | `EVCalculator`, `KellyFraction` | p_win, reward, risk → float |
-| `core/fundamental_regime.py` | `FundamentalRegime` | M2/PMI/Shibor → BULLISH/NEUTRAL/BEARISH |
+| `core/signals.py` | `Criterion123`, `Criterion2B`, `FourDayRule`, `ThreeDayPullback`, `ABCCorrection`, `NarrowRangeBreakout` | OHLC arrays → `Signal(direction,confidence,stop,target)` or None |
+| `core/probability.py` | `EVCalculator`, `KellyFraction`, `vic_position_fraction()` | p_win, reward, risk → float |
+| `core/fundamental_regime.py` | `FundamentalRegime` | M2/PMI/Shibor/PE/margin → BULLISH/NEUTRAL/BEARISH + risk_budget |
 | `core/consensus.py` | `ConsensusEngine`, `DowConfirmation` | signals + regime + env → weighted consensus |
 | `core/capital.py` | `CapitalManager`, `TieredPositionSizer` | portfolio value → tier level, position size |
 | `core/risk.py` | `RiskRewardFilter`, `StopManager`, `TimeStop`, `ConsecutiveLossPause` | prices + position → HOLD/STOP/TAKE_PROFIT/TIME_EXIT |
 | `core/market_env.py` | `MarketEnvClassifier` + `ENV_ADAPTATION` | CSI300 daily+weekly → environment string + params |
+| `core/alpha_factors.py` | `FactorRanker` | ticker + data → composite score |
+| `core/divergence.py` | `RSIDivergence` | price arrays → confidence multiplier |
+| `core/stock_pool.py` | stock pool management | watchlist filtering |
 | `portfolio/mgr.py` | `PortfolioMgr` | risk check, entry/exit accounting, state serialization |
 | `strategies/vic_strategy.py` | `TraderVicStrategy.next()` | bar_data + csi300 → list[Order] |
 | `reports/backtest.py` | `run_backtest()`, metrics, plotting | strategy + data → HTML report |

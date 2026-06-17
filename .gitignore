@@ -3,3 +3,23 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.egg-info/
+
+# Data caches
+data/*.csv
+data/manifest.json
+data/micro/
+
+# Output artifacts
+output/
+*.html
+*.png
+
+# Sensitive / auto-generated
+.env
+*.txt
+
+# Editor / IDE
+.vscode/
+.idea/
+.cursor/
+.claude/

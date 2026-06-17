@@ -59,12 +59,20 @@ class SwingDetector:
         self._swing_highs: list[SwingPoint] = []
         self._swing_lows: list[SwingPoint] = []
         self._state: TrendDirection = TrendDirection.UNDEFINED
+        self._pivots_dirty = True
+        self._cached_high_pivots: list[SwingPoint] = []
+        self._cached_low_pivots: list[SwingPoint] = []
 
-    def _find_pivot_highs(self) -> list[SwingPoint]:
-        """在最近 lookback*2 根 K 线中找摆动高点
+    def _compute_pivots(self) -> None:
+        """计算并缓存摆动点"""
+        if not self._pivots_dirty:
+            return
+        self._cached_high_pivots = self._find_pivot_highs_raw()
+        self._cached_low_pivots = self._find_pivot_lows_raw()
+        self._pivots_dirty = False
 
-        摆动高点定义：当前 high 是左右各 lookback 根 K 线中的最高值。
-        """
+    def _find_pivot_highs_raw(self) -> list[SwingPoint]:
+        """在最近 lookback*2 根 K 线中找摆动高点"""
         pivots = []
         n = len(self._highs)
         if n < self.lookback * 2 + 1:
@@ -73,12 +81,11 @@ class SwingDetector:
         for i in range(start + self.lookback, n - self.lookback):
             window = self._highs[i - self.lookback : i + self.lookback + 1]
             if self._highs[i] == max(window):
-                # 避免同一区域重复标记
                 if not pivots or i - pivots[-1].index >= self.lookback:
                     pivots.append(SwingPoint(i, self._highs[i], True))
         return pivots
 
-    def _find_pivot_lows(self) -> list[SwingPoint]:
+    def _find_pivot_lows_raw(self) -> list[SwingPoint]:
         """找摆动低点"""
         pivots = []
         n = len(self._lows)
@@ -91,6 +98,14 @@ class SwingDetector:
                 if not pivots or i - pivots[-1].index >= self.lookback:
                     pivots.append(SwingPoint(i, self._lows[i], False))
         return pivots
+
+    def _find_pivot_highs(self) -> list[SwingPoint]:
+        self._compute_pivots()
+        return self._cached_high_pivots
+
+    def _find_pivot_lows(self) -> list[SwingPoint]:
+        self._compute_pivots()
+        return self._cached_low_pivots
 
     def _determine_state(self) -> TrendDirection:
         """根据最近摆动点判断趋势方向
@@ -152,6 +167,7 @@ class SwingDetector:
         self._highs.append(high)
         self._lows.append(low)
         self._closes.append(close)
+        self._pivots_dirty = True
 
         # 只保留最近 200 根
         max_len = max(self.lookback * 20, 200)
